@@ -6,6 +6,7 @@ import {
   AimOutlined,
   TagOutlined,
   ReadOutlined,
+  AlignLeftOutlined,
 } from '@ant-design/icons-vue'
 import { usePaperStore } from '@/stores'
 import {
@@ -15,6 +16,10 @@ import {
   type ReadingPurpose,
   type SectionCategory,
 } from '@/types'
+
+defineProps<{
+  selectedSection?: PaperSection | null
+}>()
 
 const paperStore = usePaperStore()
 const selectedPurpose = ref<ReadingPurpose | null>(null)
@@ -41,11 +46,39 @@ async function selectPurpose(purpose: ReadingPurpose) {
   await paperStore.getRecommendation(purpose)
 }
 
+function sectionSummaryText(s: PaperSection): string {
+  if (!s.summary) return ''
+  if (typeof s.summary === 'string') return s.summary
+  return s.summary.content ?? ''
+}
+
 onMounted(loadSummary)
 </script>
 
 <template>
   <div class="p-4 space-y-5 overflow-auto h-full">
+    <!-- Paragraph summary (from PDF click) -->
+    <section v-if="selectedSection">
+      <div class="flex items-center gap-2 mb-2">
+        <AlignLeftOutlined class="text-primary" />
+        <h4 class="text-sm font-semibold text-text-primary">段落总结</h4>
+      </div>
+      <div class="rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
+        <p class="text-sm font-medium text-text-primary mb-1">
+          {{ selectedSection.title || '未命名章节' }}
+        </p>
+        <p
+          v-if="sectionSummaryText(selectedSection)"
+          class="text-sm text-text-secondary leading-relaxed"
+        >
+          {{ sectionSummaryText(selectedSection) }}
+        </p>
+        <p v-else class="text-xs text-text-muted italic">
+          该章节暂无总结内容
+        </p>
+      </div>
+    </section>
+
     <!-- One-sentence summary -->
     <section v-if="paperStore.oneSentenceSummary">
       <div class="flex items-center gap-2 mb-2">

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
-import { renderPage, getPageTextContent } from '@/utils/pdf'
+import { ref, onMounted, watch, nextTick, toRaw } from 'vue'
+import { TextLayer } from 'pdfjs-dist'
+import { renderPage } from '@/utils/pdf'
 import { usePaperStore, useTranslationStore } from '@/stores'
 
 const props = defineProps<{
@@ -19,26 +20,25 @@ const translationStore = useTranslationStore()
 
 const canvasRef = ref<HTMLCanvasElement>()
 const textLayerRef = ref<HTMLDivElement>()
-const _translationOverlayRef = ref<HTMLDivElement>()
 const pageWidth = ref(0)
 const pageHeight = ref(0)
 
-interface TextBlock {
+interface TranslationBlock {
   text: string
-  x: number
-  y: number
-  width: number
-  height: number
-  fontSize: number
+  el: HTMLElement
   translation?: string
 }
 
-const textBlocks = ref<TextBlock[]>([])
+const translationBlocks = ref<TranslationBlock[]>([])
+
+let activeTextLayer: InstanceType<typeof TextLayer> | null = null
 
 async function render() {
   if (!canvasRef.value || !props.pdf) return
+
+  const rawPdf = toRaw(props.pdf)
   const { width, height } = await renderPage(
-    props.pdf,
+    rawPdf,
     props.pageNumber,
     canvasRef.value,
     paperStore.scale,
@@ -46,33 +46,65 @@ async function render() {
   pageWidth.value = width
   pageHeight.value = height
 
-  await buildTextLayer()
+  await buildTextLayer(rawPdf)
 }
 
-async function buildTextLayer() {
+async function buildTextLayer(rawPdf: any) {
   if (!textLayerRef.value) return
-  const textContent = await getPageTextContent(props.pdf, props.pageNumber)
 
-  const blocks: TextBlock[] = []
-  for (const item of textContent.items) {
-    if (!('str' in item) || !item.str.trim()) continue
-    const tx = item.transform
-    blocks.push({
-      text: item.str,
-      x: tx[4] * paperStore.scale,
-      y: pageHeight.value - tx[5] * paperStore.scale - item.height * paperStore.scale,
-      width: item.width * paperStore.scale,
-      height: item.height * paperStore.scale,
-      fontSize: Math.abs(tx[0]) * paperStore.scale,
+  if (activeTextLayer) {
+    activeTextLayer.cancel()
+    activeTextLayer = null
+  }
+  textLayerRef.value.replaceChildren()
+
+  const page = await rawPdf.getPage(props.pageNumber)
+  const viewport = page.getViewport({ scale: paperStore.scale })
+  const textContent = await page.getTextContent()
+
+  const textLayer = new TextLayer({
+    textContentSource: textContent,
+    container: textLayerRef.value,
+    viewport,
+  })
+  activeTextLayer = textLayer
+  await textLayer.render()
+
+  attachSpanEvents()
+  collectTranslationBlocks()
+}
+
+function attachSpanEvents() {
+  if (!textLayerRef.value) return
+  const spans = textLayerRef.value.querySelectorAll<HTMLSpanElement>('span')
+  for (const span of spans) {
+    if (!span.textContent?.trim()) continue
+    span.addEventListener('click', (e) => {
+      const rect = span.getBoundingClientRect()
+      emit('paragraphClick', {
+        text: span.textContent?.trim() || '',
+        pageNumber: props.pageNumber,
+        rect,
+      })
     })
   }
-  textBlocks.value = blocks
+}
+
+function collectTranslationBlocks() {
+  if (!textLayerRef.value) return
+  const blocks: TranslationBlock[] = []
+  const spans = textLayerRef.value.querySelectorAll<HTMLSpanElement>('span')
+  for (const span of spans) {
+    const text = span.textContent?.trim()
+    if (!text || text.length < 3) continue
+    blocks.push({ text, el: span })
+  }
+  translationBlocks.value = blocks
 }
 
 async function loadTranslations() {
   if (!paperStore.isTranslateMode || !paperStore.currentPaper) return
-  for (const block of textBlocks.value) {
-    if (block.text.length < 3) continue
+  for (const block of translationBlocks.value) {
     const cached = translationStore.getCached(
       paperStore.currentPaper.id,
       block.text,
@@ -103,14 +135,17 @@ function handleMouseUp() {
   }
 }
 
-function handleParagraphClick(block: TextBlock, event: MouseEvent) {
-  const target = event.currentTarget as HTMLElement
-  const rect = target.getBoundingClientRect()
-  emit('paragraphClick', {
-    text: block.text,
-    pageNumber: props.pageNumber,
-    rect,
-  })
+function getBlockPosition(block: TranslationBlock) {
+  const container = textLayerRef.value
+  if (!container) return { left: '0px', top: '0px', maxWidth: '200px', fontSize: '11px' }
+  const containerRect = container.getBoundingClientRect()
+  const elRect = block.el.getBoundingClientRect()
+  return {
+    left: `${elRect.left - containerRect.left}px`,
+    top: `${elRect.top - containerRect.top + elRect.height + 2}px`,
+    maxWidth: `${Math.max(elRect.width, 200)}px`,
+    fontSize: `${Math.max(parseFloat(getComputedStyle(block.el).fontSize) * 0.8, 11)}px`,
+  }
 }
 
 onMounted(render)
@@ -129,62 +164,28 @@ watch(
 
 <template>
   <div
-    class="relative mx-auto bg-white shadow-card my-3"
+    class="pdf-page relative mx-auto bg-white shadow-card my-3"
     :style="{ width: `${pageWidth}px`, height: `${pageHeight}px` }"
     @mouseup="handleMouseUp"
   >
     <canvas ref="canvasRef" class="block" />
 
-    <!-- Invisible text layer for selection -->
     <div
       ref="textLayerRef"
-      class="absolute inset-0 select-text"
-    >
-      <span
-        v-for="(block, idx) in textBlocks"
-        :key="idx"
-        class="absolute cursor-text hover:bg-primary/5 transition-colors rounded-sm group"
-        :style="{
-          left: `${block.x}px`,
-          top: `${block.y}px`,
-          width: `${block.width}px`,
-          height: `${block.height}px`,
-          fontSize: `${block.fontSize}px`,
-          lineHeight: `${block.height}px`,
-          color: 'transparent',
-        }"
-        @click="handleParagraphClick(block, $event)"
-      >
-        {{ block.text }}
-
-        <!-- Paragraph summary trigger icon -->
-        <button
-          class="absolute -right-6 top-0 w-5 h-5 rounded bg-primary/10 text-primary
-                 flex items-center justify-center opacity-0 group-hover:opacity-100
-                 transition-opacity text-xs"
-          title="段落总结"
-          @click.stop="handleParagraphClick(block, $event)"
-        >
-          ∑
-        </button>
-      </span>
-    </div>
+      class="textLayer absolute inset-0"
+    />
 
     <!-- Translation overlay -->
     <div
       v-if="paperStore.isTranslateMode"
-      ref="translationOverlayRef"
       class="absolute inset-0 pointer-events-none"
     >
       <div
-        v-for="(block, idx) in textBlocks.filter((b) => b.translation)"
+        v-for="(block, idx) in translationBlocks.filter((b) => b.translation)"
         :key="`tr-${idx}`"
         class="absolute bg-white/90 text-primary-dark px-1 rounded-sm border border-primary/10"
         :style="{
-          left: `${block.x}px`,
-          top: `${block.y + block.height + 2}px`,
-          maxWidth: `${Math.max(block.width, 200)}px`,
-          fontSize: `${Math.max(block.fontSize * 0.8, 11)}px`,
+          ...getBlockPosition(block),
           lineHeight: '1.4',
         }"
       >
@@ -193,3 +194,29 @@ watch(
     </div>
   </div>
 </template>
+
+<style>
+.pdf-page .textLayer {
+  opacity: 0.25;
+  line-height: 1;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+}
+
+.pdf-page .textLayer :is(span, br) {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}
+
+.pdf-page .textLayer span::selection {
+  background: rgba(0, 100, 200, 0.3);
+}
+
+.pdf-page .textLayer span:hover {
+  background: rgba(var(--color-primary-rgb, 59, 130, 246), 0.05);
+  border-radius: 2px;
+}
+</style>

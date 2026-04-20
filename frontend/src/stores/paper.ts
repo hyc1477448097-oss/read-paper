@@ -104,6 +104,14 @@ export const usePaperStore = defineStore('paper', () => {
     recommendReason.value = result.reason
   }
 
+  async function updateDomain(domain: string) {
+    if (!currentPaper.value) return
+    const updated = await api.patchPaper(currentPaper.value.id, {
+      domain: domain || null,
+    })
+    currentPaper.value = updated
+  }
+
   function addHighlight(highlight: PaperHighlight) {
     highlights.value.push(highlight)
   }
@@ -164,6 +172,7 @@ export const usePaperStore = defineStore('paper', () => {
     summarizeAll,
     loadOneSentenceSummary,
     getRecommendation,
+    updateDomain,
     addHighlight,
     removeHighlight,
     setPage,

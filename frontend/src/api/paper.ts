@@ -32,6 +32,14 @@ export async function getPaper(paperId: string): Promise<Paper> {
   return data
 }
 
+export async function patchPaper(
+  paperId: string,
+  fields: { domain?: string | null },
+): Promise<Paper> {
+  const { data } = await apiClient.patch<Paper>(`/papers/${paperId}`, fields)
+  return data
+}
+
 export async function getPaperSections(paperId: string): Promise<PaperSection[]> {
   const { data } = await apiClient.get<PaperSection[]>(`/papers/${paperId}/sections`)
   return data
@@ -41,10 +49,12 @@ export async function translateText(
   paperId: string,
   text: string,
   pageNumber: number,
+  domain?: string,
 ): Promise<{ translated: string; domain: string }> {
   const { data } = await apiClient.post(`/papers/${paperId}/translate`, {
     text,
     page_number: pageNumber,
+    domain: domain || undefined,
   })
   return data
 }

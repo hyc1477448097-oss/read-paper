@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.db.postgres import get_db
 from app.db.milvus import insert_chunks, delete_paper_chunks
 from app.models.paper import Paper, PaperSection, Reference
-from app.schemas.paper import PaperOut, PaperBrief, SectionOut, ReferenceOut
+from app.schemas.paper import PaperOut, PaperBrief, PaperPatch, SectionOut, ReferenceOut
 from app.services.pdf_parser import parse_pdf, chunk_text
 from app.services.llm_service import get_embeddings
 
@@ -69,6 +69,7 @@ async def upload_paper(
         id=paper_id,
         title=parsed.title,
         authors=parsed.authors,
+        domain=parsed.keywords,
         file_path=str(save_path),
         page_count=parsed.page_count,
     )
@@ -177,6 +178,18 @@ async def get_paper_references(paper_id: str, db: AsyncSession = Depends(get_db)
         if not paper:
             raise HTTPException(status_code=404, detail="论文不存在")
     return refs
+
+
+@router.patch("/{paper_id}", response_model=PaperOut)
+async def patch_paper(paper_id: str, body: PaperPatch, db: AsyncSession = Depends(get_db)):
+    paper = await db.get(Paper, paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(paper, field, value)
+    await db.commit()
+    await db.refresh(paper)
+    return paper
 
 
 @router.delete("/{paper_id}")

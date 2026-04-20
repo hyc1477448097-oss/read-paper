@@ -35,6 +35,7 @@ class ParsedReference:
 class ParsedPaper:
     title: str
     authors: str | None = None
+    keywords: str | None = None
     page_count: int = 0
     full_text: str = ""
     sections: list[ParsedSection] = field(default_factory=list)
@@ -45,6 +46,11 @@ _HEADING_RE = re.compile(
     r"^(\d+\.?\s+|[IVXLC]+\.?\s+|[A-Z]\.?\s+)"
     r"(Abstract|Introduction|Related\s+Work|Background|Method|Approach|"
     r"Experiment|Result|Discussion|Conclusion|Acknowledge|Reference|Appendix)",
+    re.IGNORECASE,
+)
+
+_KEYWORDS_RE = re.compile(
+    r"(?:Keywords|Key\s*words|KEYWORDS|KEY\s*WORDS)\s*[:：—\-]\s*(.+)",
     re.IGNORECASE,
 )
 
@@ -68,6 +74,20 @@ def _detect_headings(blocks: list[dict], page_idx: int) -> list[tuple[str, int, 
                 level = 1 if avg_size >= 13 else 2
                 headings.append((text, level, page_idx))
     return headings
+
+
+def _extract_keywords(text: str) -> str | None:
+    """Extract the Keywords line from the first few thousand characters of the paper."""
+    # Keywords typically appear near the top (abstract area)
+    search_area = text[:5000]
+    m = _KEYWORDS_RE.search(search_area)
+    if not m:
+        return None
+    raw = m.group(1).strip()
+    # Take content up to the next line break or section heading
+    raw = re.split(r"\n\s*\n|\n\d+\.?\s+[A-Z]", raw)[0].strip()
+    raw = re.sub(r"\s+", " ", raw).strip(" .;")
+    return raw if raw else None
 
 
 def _extract_references(text: str) -> list[ParsedReference]:
@@ -151,11 +171,13 @@ def parse_pdf(file_path: str | Path) -> ParsedPaper:
             page_end=page_count - 1,
         ))
 
+    keywords = _extract_keywords(full_text)
     references = _extract_references(full_text)
     doc.close()
 
     return ParsedPaper(
         title=title,
+        keywords=keywords,
         page_count=page_count,
         full_text=full_text,
         sections=sections,

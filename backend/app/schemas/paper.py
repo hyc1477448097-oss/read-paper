@@ -11,6 +11,10 @@ class PaperCreate(BaseModel):
     domain: str | None = None
 
 
+class PaperPatch(BaseModel):
+    domain: str | None = None
+
+
 class PaperOut(BaseModel):
     id: str
     title: str

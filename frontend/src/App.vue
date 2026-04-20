@@ -3,7 +3,7 @@ import AppHeader from '@/components/common/AppHeader.vue'
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col bg-surface">
+  <div class="h-screen flex flex-col overflow-hidden bg-surface">
     <AppHeader />
     <RouterView v-slot="{ Component }">
       <Transition name="fade" mode="out-in">

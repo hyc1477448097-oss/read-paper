@@ -18,23 +18,18 @@ export async function renderPage(
   scale: number,
 ): Promise<{ width: number; height: number }> {
   const page = await pdf.getPage(pageNumber)
-  const viewport = page.getViewport({ scale })
+  const dpr = window.devicePixelRatio || 1
+  const viewport = page.getViewport({ scale: scale * dpr })
 
   canvas.width = viewport.width
   canvas.height = viewport.height
+  canvas.style.width = `${viewport.width / dpr}px`
+  canvas.style.height = `${viewport.height / dpr}px`
 
   const ctx = canvas.getContext('2d')!
-  await page.render({ canvasContext: ctx, viewport, canvas }).promise
+  await page.render({ canvasContext: ctx, viewport }).promise
 
-  return { width: viewport.width, height: viewport.height }
-}
-
-export async function getPageTextContent(
-  pdf: PdfDoc,
-  pageNumber: number,
-) {
-  const page = await pdf.getPage(pageNumber)
-  return await page.getTextContent()
+  return { width: viewport.width / dpr, height: viewport.height / dpr }
 }
 
 export function getSelectedText(): {

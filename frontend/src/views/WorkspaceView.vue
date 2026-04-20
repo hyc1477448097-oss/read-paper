@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
-import { usePaperStore } from '@/stores'
+import { usePaperStore, useTranslationStore } from '@/stores'
+import type { PaperSection } from '@/types'
 import CatalogPanel from '@/components/catalog/CatalogPanel.vue'
 import PdfViewer from '@/components/pdf/PdfViewer.vue'
 import FunctionPanel from '@/components/function/FunctionPanel.vue'
 
 const paperStore = usePaperStore()
+const translationStore = useTranslationStore()
 const functionPanelRef = ref<InstanceType<typeof FunctionPanel>>()
 
 const selectedContext = ref<{ text: string; pageNumber: number } | null>(null)
+const selectedSection = ref<PaperSection | null>(null)
+const translationResult = ref<{ original: string; translated: string } | null>(null)
 
 const catalogOpen = ref(true)
 const functionOpen = ref(true)
@@ -24,15 +28,30 @@ const pdfFileUrl = computed(() =>
 )
 
 function handleTextSelected(payload: { text: string; pageNumber: number }) {
-  selectedContext.value = payload
-  if (!functionOpen.value) functionOpen.value = true
-  functionPanelRef.value?.switchTo('chat')
+  const activeFunc = functionPanelRef.value?.activeFunc
+  if (activeFunc === 'translate') {
+    if (!paperStore.currentPaper) return
+    translationResult.value = null
+    const domain = functionPanelRef.value?.userDomain || undefined
+    translationStore
+      .translate(paperStore.currentPaper.id, payload.text, payload.pageNumber, domain)
+      .then((seg) => {
+        translationResult.value = { original: seg.original, translated: seg.translated }
+      })
+      .catch(() => {})
+  } else if (activeFunc === 'chat') {
+    selectedContext.value = payload
+  }
 }
 
 function handleParagraphClick(payload: { text: string; pageNumber: number; rect: DOMRect }) {
-  selectedContext.value = { text: payload.text, pageNumber: payload.pageNumber }
-  if (!functionOpen.value) functionOpen.value = true
-  functionPanelRef.value?.switchTo('summary')
+  const activeFunc = functionPanelRef.value?.activeFunc
+  if (activeFunc === 'summary') {
+    const match = paperStore.sections.find(
+      (s: PaperSection) => s.content && s.content.includes(payload.text),
+    )
+    if (match) selectedSection.value = match
+  }
 }
 
 function handleSelectPaper(paperId: string) {
@@ -146,6 +165,8 @@ const startFunctionResize = startResize(
         <FunctionPanel
           ref="functionPanelRef"
           :selected-context="selectedContext"
+          :selected-section="selectedSection"
+          :translation-result="translationResult"
           @collapse="functionOpen = false"
         />
       </div>

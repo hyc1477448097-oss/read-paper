@@ -23,6 +23,7 @@ export const useTranslationStore = defineStore('translation', () => {
     paperId: string,
     text: string,
     pageNumber: number,
+    domain?: string,
   ): Promise<TranslationSegment> {
     const key = cacheKey(paperId, text)
     const existing = cache.get(key)
@@ -30,19 +31,20 @@ export const useTranslationStore = defineStore('translation', () => {
 
     loading.value = true
     try {
-      const { translated, domain } = await api.translateText(
+      const { translated, domain: returnedDomain } = await api.translateText(
         paperId,
         text,
         pageNumber,
+        domain,
       )
-      detectedDomain.value = domain
+      detectedDomain.value = returnedDomain
 
       const segment: TranslationSegment = {
         id: crypto.randomUUID(),
         original: text,
         translated,
         pageNumber,
-        domain,
+        domain: returnedDomain,
       }
       cache.set(key, segment)
       return segment
