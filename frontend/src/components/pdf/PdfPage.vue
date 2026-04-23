@@ -62,6 +62,8 @@ async function buildTextLayer(rawPdf: any) {
   const viewport = page.getViewport({ scale: paperStore.scale })
   const textContent = await page.getTextContent()
 
+  if (!textLayerRef.value) return
+
   const textLayer = new TextLayer({
     textContentSource: textContent,
     container: textLayerRef.value,

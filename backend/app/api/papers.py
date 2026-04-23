@@ -22,6 +22,13 @@ from app.services.llm_service import get_embeddings
 router = APIRouter()
 
 
+def _sanitize(text: str | None) -> str | None:
+    """移除 PostgreSQL 不支持的 NULL 字节。"""
+    if text is None:
+        return None
+    return text.replace('\x00', '')
+
+
 def _normalize_title(title: str) -> str:
     """统一大小写与空白，用于重复标题比对。"""
     return " ".join((title or "").split()).lower()
@@ -67,9 +74,9 @@ async def upload_paper(
 
     paper = Paper(
         id=paper_id,
-        title=parsed.title,
-        authors=parsed.authors,
-        domain=parsed.keywords,
+        title=_sanitize(parsed.title),
+        authors=_sanitize(parsed.authors),
+        domain=_sanitize(parsed.keywords),
         file_path=str(save_path),
         page_count=parsed.page_count,
     )
@@ -79,8 +86,8 @@ async def upload_paper(
         db.add(PaperSection(
             paper_id=paper_id,
             idx=sec.idx,
-            title=sec.title,
-            content=sec.content,
+            title=_sanitize(sec.title),
+            content=_sanitize(sec.content),
             level=sec.level,
             page_start=sec.page_start,
             page_end=sec.page_end,
@@ -90,11 +97,11 @@ async def upload_paper(
         db.add(Reference(
             paper_id=paper_id,
             idx=ref.idx,
-            raw_text=ref.raw_text,
-            title=ref.title,
-            authors=ref.authors,
+            raw_text=_sanitize(ref.raw_text),
+            title=_sanitize(ref.title),
+            authors=_sanitize(ref.authors),
             year=ref.year,
-            venue=ref.venue,
+            venue=_sanitize(ref.venue),
         ))
 
     await db.commit()
