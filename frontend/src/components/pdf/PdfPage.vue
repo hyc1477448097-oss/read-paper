@@ -1,8 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, toRaw } from 'vue'
-import { TextLayer } from 'pdfjs-dist'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, toRaw } from 'vue'
+import { normalizeUnicode, setLayerDimensions } from 'pdfjs-dist'
 import { renderPage } from '@/utils/pdf'
+import { removeNullCharacters } from '@/vendor/pdfjs-web/remove-null-characters'
+import { TextLayerBuilder } from '@/vendor/pdfjs-web/text-layer-builder'
 import { usePaperStore, useTranslationStore } from '@/stores'
+import '@/vendor/pdfjs-web/text-layer-builder.css'
 
 const props = defineProps<{
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -18,10 +21,9 @@ const emit = defineEmits<{
 const paperStore = usePaperStore()
 const translationStore = useTranslationStore()
 
+const pageRootRef = ref<HTMLDivElement>()
 const canvasRef = ref<HTMLCanvasElement>()
-const textLayerRef = ref<HTMLDivElement>()
-const pageWidth = ref(0)
-const pageHeight = ref(0)
+const textLayerSlotRef = ref<HTMLDivElement>()
 
 interface TranslationBlock {
   text: string
@@ -31,57 +33,81 @@ interface TranslationBlock {
 
 const translationBlocks = ref<TranslationBlock[]>([])
 
-let activeTextLayer: InstanceType<typeof TextLayer> | null = null
+let textLayerBuilder: TextLayerBuilder | null = null
+let layerAbort: AbortController | null = null
 
 async function render() {
-  if (!canvasRef.value || !props.pdf) return
+  if (!canvasRef.value || !pageRootRef.value || !textLayerSlotRef.value || !props.pdf)
+    return
 
   const rawPdf = toRaw(props.pdf)
-  const { width, height } = await renderPage(
-    rawPdf,
-    props.pageNumber,
-    canvasRef.value,
-    paperStore.scale,
-  )
-  pageWidth.value = width
-  pageHeight.value = height
+  const pageRoot = pageRootRef.value
+  const canvas = canvasRef.value
+  const slot = textLayerSlotRef.value
 
-  await buildTextLayer(rawPdf)
-}
+  textLayerBuilder?.cancel()
+  textLayerBuilder = null
+  layerAbort?.abort()
+  layerAbort = new AbortController()
+  slot.replaceChildren()
 
-async function buildTextLayer(rawPdf: any) {
-  if (!textLayerRef.value) return
-
-  if (activeTextLayer) {
-    activeTextLayer.cancel()
-    activeTextLayer = null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let viewport: any
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let page: any
+  try {
+    const result = await renderPage(
+      rawPdf,
+      props.pageNumber,
+      canvas,
+      paperStore.scale,
+    )
+    viewport = result.viewport
+    page = result.page
+  } catch {
+    return
   }
-  textLayerRef.value.replaceChildren()
 
-  const page = await rawPdf.getPage(props.pageNumber)
-  const viewport = page.getViewport({ scale: paperStore.scale })
-  const textContent = await page.getTextContent()
+  pageRoot.style.setProperty('--user-unit', String(viewport.userUnit))
+  pageRoot.style.setProperty('--scale-factor', String(viewport.scale))
+  pageRoot.style.setProperty('--total-scale-factor', String(viewport.scale))
+  pageRoot.style.setProperty('--scale-round-x', '1px')
+  pageRoot.style.setProperty('--scale-round-y', '1px')
+  setLayerDimensions(pageRoot, viewport, true, false)
 
-  if (!textLayerRef.value) return
-
-  const textLayer = new TextLayer({
-    textContentSource: textContent,
-    container: textLayerRef.value,
-    viewport,
+  const builder = new TextLayerBuilder({
+    pdfPage: page,
+    highlighter: null,
+    accessibilityManager: null,
+    enablePermissions: false,
+    onAppend: (div) => {
+      slot.append(div)
+      attachSpanEvents(div)
+      collectTranslationBlocks(div)
+    },
+    abortSignal: layerAbort.signal,
   })
-  activeTextLayer = textLayer
-  await textLayer.render()
+  textLayerBuilder = builder
 
-  attachSpanEvents()
-  collectTranslationBlocks()
+  try {
+    await builder.render({ viewport })
+  } catch {
+    textLayerBuilder = null
+    return
+  }
+
+  if (paperStore.isTranslateMode) {
+    await nextTick()
+    await loadTranslations()
+  }
 }
 
-function attachSpanEvents() {
-  if (!textLayerRef.value) return
-  const spans = textLayerRef.value.querySelectorAll<HTMLSpanElement>('span')
+function attachSpanEvents(root: HTMLElement) {
+  const spans = root.querySelectorAll<HTMLSpanElement>('span')
   for (const span of spans) {
+    if (span.querySelector('span')) continue
     if (!span.textContent?.trim()) continue
-    span.addEventListener('click', (e) => {
+    span.addEventListener('click', () => {
       const rect = span.getBoundingClientRect()
       emit('paragraphClick', {
         text: span.textContent?.trim() || '',
@@ -92,10 +118,9 @@ function attachSpanEvents() {
   }
 }
 
-function collectTranslationBlocks() {
-  if (!textLayerRef.value) return
+function collectTranslationBlocks(root: HTMLElement) {
   const blocks: TranslationBlock[] = []
-  const spans = textLayerRef.value.querySelectorAll<HTMLSpanElement>('span')
+  const spans = root.querySelectorAll<HTMLSpanElement>('span')
   for (const span of spans) {
     const text = span.textContent?.trim()
     if (!text || text.length < 3) continue
@@ -129,16 +154,21 @@ async function loadTranslations() {
 }
 
 function handleMouseUp() {
+  const root = textLayerBuilder?.div
   const selection = window.getSelection()
-  if (!selection || selection.isCollapsed) return
-  const text = selection.toString().trim()
+  if (!selection || selection.isCollapsed || !selection.rangeCount || !root) return
+
+  const range = selection.getRangeAt(0)
+  if (!root.contains(range.commonAncestorContainer)) return
+
+  const text = removeNullCharacters(normalizeUnicode(selection.toString())).trimEnd()
   if (text) {
     emit('textSelected', { text, pageNumber: props.pageNumber })
   }
 }
 
 function getBlockPosition(block: TranslationBlock) {
-  const container = textLayerRef.value
+  const container = textLayerBuilder?.div
   if (!container) return { left: '0px', top: '0px', maxWidth: '200px', fontSize: '11px' }
   const containerRect = container.getBoundingClientRect()
   const elRect = block.el.getBoundingClientRect()
@@ -151,6 +181,13 @@ function getBlockPosition(block: TranslationBlock) {
 }
 
 onMounted(render)
+
+onBeforeUnmount(() => {
+  textLayerBuilder?.cancel()
+  textLayerBuilder = null
+  layerAbort?.abort()
+  layerAbort = null
+})
 
 watch(() => paperStore.scale, render)
 watch(
@@ -166,26 +203,24 @@ watch(
 
 <template>
   <div
+    ref="pageRootRef"
     class="pdf-page relative mx-auto bg-white shadow-card my-3"
-    :style="{ width: `${pageWidth}px`, height: `${pageHeight}px` }"
     @mouseup="handleMouseUp"
   >
-    <canvas ref="canvasRef" class="block" />
+    <div class="absolute inset-0 overflow-hidden">
+      <canvas ref="canvasRef" class="block h-full w-full" />
+    </div>
 
-    <div
-      ref="textLayerRef"
-      class="textLayer absolute inset-0"
-    />
+    <div ref="textLayerSlotRef" class="absolute inset-0 z-[1]" />
 
-    <!-- Translation overlay -->
     <div
       v-if="paperStore.isTranslateMode"
-      class="absolute inset-0 pointer-events-none"
+      class="pointer-events-none absolute inset-0 z-[2]"
     >
       <div
         v-for="(block, idx) in translationBlocks.filter((b) => b.translation)"
         :key="`tr-${idx}`"
-        class="absolute bg-white/90 text-primary-dark px-1 rounded-sm border border-primary/10"
+        class="absolute rounded-sm border border-primary/10 bg-white/90 px-1 text-primary-dark"
         :style="{
           ...getBlockPosition(block),
           lineHeight: '1.4',
@@ -196,29 +231,3 @@ watch(
     </div>
   </div>
 </template>
-
-<style>
-.pdf-page .textLayer {
-  opacity: 0.25;
-  line-height: 1;
-  text-size-adjust: none;
-  forced-color-adjust: none;
-}
-
-.pdf-page .textLayer :is(span, br) {
-  color: transparent;
-  position: absolute;
-  white-space: pre;
-  cursor: text;
-  transform-origin: 0% 0%;
-}
-
-.pdf-page .textLayer span::selection {
-  background: rgba(0, 100, 200, 0.3);
-}
-
-.pdf-page .textLayer span:hover {
-  background: rgba(var(--color-primary-rgb, 59, 130, 246), 0.05);
-  border-radius: 2px;
-}
-</style>
