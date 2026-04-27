@@ -21,12 +21,15 @@ from app.schemas.paper import (
     SectionOut,
     RecommendRequest,
     RecommendResponse,
+    ChapterSummaryRequest,
+    ChapterSummaryResponse,
 )
 from app.services.baidu_translate import BaiduTranslateError, translate_with_baidu
 from app.services.llm_service import (
     translate_text_llm,
     answer_question,
     summarize_section,
+    summarize_outline_chapter,
     one_sentence_summary,
     recommend_sections,
     get_embedding,
@@ -167,6 +170,63 @@ async def get_one_sentence(paper_id: str, db: AsyncSession = Depends(get_db)):
         "one_sentence": paper.one_sentence_summary,
         "innovation_points": paper.innovation_points,
     }
+
+
+def _section_page_span(sec: PaperSection) -> tuple[int, int] | None:
+    """返回 1-based 闭区间页码；无页信息则 None。"""
+    if sec.page_start is None:
+        return None
+    start = int(sec.page_start)
+    end = int(sec.page_end) if sec.page_end is not None else start
+    if end < start:
+        end = start
+    return start, end
+
+
+def _overlaps(ps: int, pe: int, span: tuple[int, int]) -> bool:
+    ss, ee = span
+    return not (ee < ps or ss > pe)
+
+
+@router.post("/{paper_id}/chapter-summary", response_model=ChapterSummaryResponse)
+async def chapter_summary(
+    paper_id: str,
+    req: ChapterSummaryRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    paper = await db.get(Paper, paper_id)
+    if not paper:
+        raise HTTPException(status_code=404, detail="论文不存在")
+    if req.page_end < req.page_start:
+        raise HTTPException(status_code=422, detail="page_end 不能小于 page_start")
+
+    domain = req.domain if req.domain is not None else paper.domain
+
+    result = await db.execute(
+        select(PaperSection)
+        .where(PaperSection.paper_id == paper_id)
+        .order_by(PaperSection.idx)
+    )
+    sections = result.scalars().all()
+
+    ps, pe = req.page_start, req.page_end
+    parts: list[str] = []
+    for sec in sections:
+        span = _section_page_span(sec)
+        if span is None or not _overlaps(ps, pe, span):
+            continue
+        title = sec.title or "段落"
+        parts.append(f"## {title}\n{sec.content}")
+
+    context = "\n\n".join(parts)[:12000]
+    if not context.strip():
+        context = (
+            "（当前页码范围内未匹配到解析器抽取的段落正文；可能正文未入库或与书签页码不对齐。"
+            "请仅根据书签标题说明该章节通常可能包含的内容类型，并提醒用户补充解析或检查 PDF。）"
+        )
+
+    summary = await summarize_outline_chapter(req.outline_title.strip(), context, domain)
+    return ChapterSummaryResponse(summary=summary, domain=domain)
 
 
 @router.post("/{paper_id}/recommend", response_model=RecommendResponse)

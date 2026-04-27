@@ -8,6 +8,7 @@ import type {
   ReadingPurpose,
   SectionCategory,
 } from '@/types'
+import type { PdfOutlineNode } from '@/utils/pdf-outline'
 import * as api from '@/api'
 
 export const usePaperStore = defineStore('paper', () => {
@@ -25,6 +26,8 @@ export const usePaperStore = defineStore('paper', () => {
   /** 全文/PDF 翻译会话：关翻译时 abort，取消进行中的请求 */
   const fullPageTranslateAbort = shallowRef<AbortController | null>(null)
   const viewMode = ref<'pdf' | 'parsed'>('pdf')
+  /** PDF 书签大纲（getOutline），切换论文或重置时清空 */
+  const pdfOutline = ref<PdfOutlineNode[] | null>(null)
 
   const loading = ref(false)
   const summarizing = ref(false)
@@ -57,6 +60,7 @@ export const usePaperStore = defineStore('paper', () => {
   }
 
   async function loadPaper(paperId: string) {
+    pdfOutline.value = null
     loading.value = true
     try {
       currentPaper.value = await api.getPaper(paperId)
@@ -144,9 +148,14 @@ export const usePaperStore = defineStore('paper', () => {
     viewMode.value = mode
   }
 
+  function setPdfOutline(nodes: PdfOutlineNode[] | null) {
+    pdfOutline.value = nodes
+  }
+
   function $reset() {
     fullPageTranslateAbort.value?.abort()
     fullPageTranslateAbort.value = null
+    pdfOutline.value = null
     currentPaper.value = null
     sections.value = []
     highlights.value = []
@@ -173,6 +182,7 @@ export const usePaperStore = defineStore('paper', () => {
     isTranslateMode,
     fullPageTranslateAbort,
     viewMode,
+    pdfOutline,
     loading,
     summarizing,
     isLoaded,
@@ -190,6 +200,7 @@ export const usePaperStore = defineStore('paper', () => {
     setScale,
     toggleTranslateMode,
     setViewMode,
+    setPdfOutline,
     $reset,
   }
 })

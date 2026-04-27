@@ -68,6 +68,27 @@ export async function translateText(
   return data
 }
 
+export async function summarizeChapter(
+  paperId: string,
+  body: {
+    outline_title: string
+    page_start: number
+    page_end: number
+    domain?: string
+  },
+): Promise<{ summary: string; domain: string | null }> {
+  const { data } = await apiClient.post<{ summary: string; domain: string | null }>(
+    `/papers/${paperId}/chapter-summary`,
+    {
+      outline_title: body.outline_title,
+      page_start: body.page_start,
+      page_end: body.page_end,
+      domain: body.domain || undefined,
+    },
+  )
+  return data
+}
+
 export async function askQuestion(
   paperId: string,
   question: string,

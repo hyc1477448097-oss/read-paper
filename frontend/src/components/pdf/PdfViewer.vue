@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, shallowRef, watch, onMounted } from 'vue'
 import { loadPdfDocument } from '@/utils/pdf'
+import { buildPdfOutlineTree } from '@/utils/pdf-outline'
 import { usePaperStore } from '@/stores'
 import PdfToolbar from './PdfToolbar.vue'
 import PdfPage from './PdfPage.vue'
@@ -25,13 +26,20 @@ const loadError = ref('')
 async function loadFile(url: string) {
   try {
     loadError.value = ''
+    paperStore.setPdfOutline(null)
     pdfDoc.value = await loadPdfDocument(url)
     paperStore.totalPages = pdfDoc.value.numPages
     paperStore.setPage(1)
+    try {
+      paperStore.setPdfOutline(await buildPdfOutlineTree(pdfDoc.value))
+    } catch {
+      paperStore.setPdfOutline(null)
+    }
     emit('fileLoaded')
   } catch (e) {
     loadError.value = 'PDF 加载失败，请检查文件是否有效。'
     console.error(e)
+    paperStore.setPdfOutline(null)
   }
 }
 

@@ -124,6 +124,20 @@ class RecommendResponse(BaseModel):
     reason: str | None = None
 
 
+class ChapterSummaryRequest(BaseModel):
+    """PDF 书签章节：前端根据大纲解析得到页码区间。"""
+
+    outline_title: str
+    page_start: int = Field(ge=1)
+    page_end: int = Field(ge=1)
+    domain: str | None = None
+
+
+class ChapterSummaryResponse(BaseModel):
+    summary: str
+    domain: str | None = None
+
+
 class RelevanceRequest(BaseModel):
     research_direction: str
     keywords: list[str] = Field(default_factory=list)

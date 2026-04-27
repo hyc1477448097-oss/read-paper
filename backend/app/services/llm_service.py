@@ -106,6 +106,28 @@ async def summarize_section(content: str, domain: str | None = None) -> dict:
         return {"summary": raw, "category": "未知"}
 
 
+async def summarize_outline_chapter(
+    outline_title: str,
+    context_text: str,
+    domain: str | None = None,
+) -> str:
+    """根据书签标题 + 解析正文摘录生成中文章节总结（非 JSON）。"""
+    system_prompt = (
+        "你是学术论文阅读助手。用户给出的是 PDF 书签中的章节标题，以及从论文中解析出的正文摘录。"
+        "这些正文来自解析器分段，页码范围与书签标题可能不完全对齐；请据实归纳，不要编造正文中没有的信息。"
+        "用中文输出「章节总结」：先用 2～4 句话概括本段在全文中的作用，再酌情分点列出方法、实验、结论等（若摘录中无某类信息则省略）。"
+        "不要使用 JSON 或 Markdown 代码块，可直接使用简短小标题加段落。"
+    )
+    if domain:
+        system_prompt += f"\n论文所属领域：{domain}。"
+    user_block = f"书签章节标题：{outline_title}\n\n--- 正文摘录 ---\n{context_text[:10000]}"
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_block},
+    ]
+    return await chat_completion(messages, temperature=0.25)
+
+
 async def one_sentence_summary(full_text: str) -> dict:
     messages = [
         {
