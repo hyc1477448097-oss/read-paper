@@ -16,7 +16,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   textSelected: [payload: { text: string; pageNumber: number }]
-  paragraphClick: [payload: { text: string; pageNumber: number; rect: DOMRect }]
 }>()
 
 const paperStore = usePaperStore()
@@ -83,7 +82,6 @@ async function render() {
     enablePermissions: false,
     onAppend: (div) => {
       slot.append(div)
-      attachSpanEvents(div)
       collectTranslationBlocks(div)
     },
     abortSignal: layerAbort.signal,
@@ -100,22 +98,6 @@ async function render() {
   if (paperStore.isTranslateMode) {
     await nextTick()
     await loadTranslations()
-  }
-}
-
-function attachSpanEvents(root: HTMLElement) {
-  const spans = root.querySelectorAll<HTMLSpanElement>('span')
-  for (const span of spans) {
-    if (span.querySelector('span')) continue
-    if (!span.textContent?.trim()) continue
-    span.addEventListener('click', () => {
-      const rect = span.getBoundingClientRect()
-      emit('paragraphClick', {
-        text: span.textContent?.trim() || '',
-        pageNumber: props.pageNumber,
-        rect,
-      })
-    })
   }
 }
 

@@ -29,7 +29,7 @@ frontend/src/
 │   ├── function/
 │   │   └── FunctionPanel.vue       # 右栏：四个功能按钮 + 输出框
 │   ├── analysis/
-│   │   ├── CoreContribution.vue    # 结构化总结（一句话总结/创新点/章节总结/阅读推荐）
+│   │   ├── CoreContribution.vue    # 结构化总结（创新点/章节总结/阅读推荐）
 │   │   ├── ReferenceAnalysis.vue   # 引用文献分析（年份分布/来源类型/级别）
 │   │   └── RelevancePanel.vue      # 契合度分析（评分/匹配话题/AI 建议）
 │   ├── chat/

@@ -13,7 +13,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   textSelected: [payload: { text: string; pageNumber: number }]
-  paragraphClick: [payload: { text: string; pageNumber: number; rect: DOMRect }]
   fileLoaded: []
 }>()
 
@@ -127,7 +126,6 @@ defineExpose({ scrollToPage })
             :pdf="pdfDoc"
             :page-number="page"
             @text-selected="emit('textSelected', $event)"
-            @paragraph-click="emit('paragraphClick', $event)"
           />
         </div>
       </template>

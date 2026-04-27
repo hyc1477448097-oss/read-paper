@@ -2,7 +2,6 @@
 import { ref, computed } from 'vue'
 import { MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons-vue'
 import { usePaperStore, useTranslationStore } from '@/stores'
-import type { PaperSection } from '@/types'
 import CatalogPanel from '@/components/catalog/CatalogPanel.vue'
 import PdfViewer from '@/components/pdf/PdfViewer.vue'
 import FunctionPanel from '@/components/function/FunctionPanel.vue'
@@ -12,7 +11,6 @@ const translationStore = useTranslationStore()
 const functionPanelRef = ref<InstanceType<typeof FunctionPanel>>()
 
 const selectedContext = ref<{ text: string; pageNumber: number } | null>(null)
-const selectedSection = ref<PaperSection | null>(null)
 const translationResult = ref<{ original: string; translated: string } | null>(null)
 
 const catalogOpen = ref(true)
@@ -41,16 +39,6 @@ function handleTextSelected(payload: { text: string; pageNumber: number }) {
       .catch(() => {})
   } else if (activeFunc === 'chat') {
     selectedContext.value = payload
-  }
-}
-
-function handleParagraphClick(payload: { text: string; pageNumber: number; rect: DOMRect }) {
-  const activeFunc = functionPanelRef.value?.activeFunc
-  if (activeFunc === 'summary') {
-    const match = paperStore.sections.find(
-      (s: PaperSection) => s.content && s.content.includes(payload.text),
-    )
-    if (match) selectedSection.value = match
   }
 }
 
@@ -145,7 +133,6 @@ const startFunctionResize = startResize(
       <PdfViewer
         :file-url="pdfFileUrl"
         @text-selected="handleTextSelected"
-        @paragraph-click="handleParagraphClick"
       />
     </div>
 
@@ -165,7 +152,6 @@ const startFunctionResize = startResize(
         <FunctionPanel
           ref="functionPanelRef"
           :selected-context="selectedContext"
-          :selected-section="selectedSection"
           :translation-result="translationResult"
           @collapse="functionOpen = false"
         />

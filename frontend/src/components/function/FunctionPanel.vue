@@ -8,7 +8,6 @@ import {
   MenuUnfoldOutlined,
   ArrowRightOutlined,
 } from '@ant-design/icons-vue'
-import type { PaperSection } from '@/types'
 import CoreContribution from '@/components/analysis/CoreContribution.vue'
 import ChatPanel from '@/components/chat/ChatPanel.vue'
 import ReferenceAnalysis from '@/components/analysis/ReferenceAnalysis.vue'
@@ -16,7 +15,6 @@ import { usePaperStore, useTranslationStore } from '@/stores'
 
 const props = defineProps<{
   selectedContext?: { text: string; pageNumber: number } | null
-  selectedSection?: PaperSection | null
   translationResult?: { original: string; translated: string } | null
 }>()
 
@@ -119,11 +117,7 @@ defineExpose({ switchTo, activeFunc, userDomain })
     <div class="flex-1 overflow-hidden">
       <Transition name="fade" mode="out-in">
         <!-- Summary -->
-        <CoreContribution
-          v-if="activeFunc === 'summary'"
-          key="summary"
-          :selected-section="selectedSection"
-        />
+        <CoreContribution v-if="activeFunc === 'summary'" key="summary" />
 
         <!-- Translation -->
         <div

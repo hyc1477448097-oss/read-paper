@@ -6,7 +6,6 @@ import type {
   PaperHighlight,
   PaperOneSentenceSummary,
   ReadingPurpose,
-  SectionCategory,
 } from '@/types'
 import type { PdfOutlineNode } from '@/utils/pdf-outline'
 import * as api from '@/api'
@@ -30,24 +29,8 @@ export const usePaperStore = defineStore('paper', () => {
   const pdfOutline = ref<PdfOutlineNode[] | null>(null)
 
   const loading = ref(false)
-  const summarizing = ref(false)
 
   const isLoaded = computed(() => currentPaper.value !== null)
-
-  const sectionsByCategory = computed(() => {
-    const map: Partial<Record<SectionCategory, PaperSection[]>> = {}
-    for (const section of sections.value) {
-      const cat =
-        section.category ??
-        (typeof section.summary === 'object' && section.summary
-          ? section.summary.category
-          : undefined)
-      if (!cat) continue
-      if (!map[cat]) map[cat] = []
-      map[cat]!.push(section)
-    }
-    return map
-  })
 
   async function uploadPaper(file: File) {
     loading.value = true
@@ -81,16 +64,6 @@ export const usePaperStore = defineStore('paper', () => {
   async function loadSections() {
     if (!currentPaper.value) return
     sections.value = await api.getPaperSections(currentPaper.value.id)
-  }
-
-  async function summarizeAll() {
-    if (!currentPaper.value) return
-    summarizing.value = true
-    try {
-      sections.value = await api.summarizeSections(currentPaper.value.id)
-    } finally {
-      summarizing.value = false
-    }
   }
 
   async function loadOneSentenceSummary() {
@@ -184,13 +157,10 @@ export const usePaperStore = defineStore('paper', () => {
     viewMode,
     pdfOutline,
     loading,
-    summarizing,
     isLoaded,
-    sectionsByCategory,
     uploadPaper,
     loadPaper,
     loadSections,
-    summarizeAll,
     loadOneSentenceSummary,
     getRecommendation,
     updateDomain,

@@ -3,25 +3,13 @@ import { ref, computed, watch, onMounted } from 'vue'
 import {
   BulbOutlined,
   AimOutlined,
-  TagOutlined,
   ReadOutlined,
-  AlignLeftOutlined,
   UnorderedListOutlined,
 } from '@ant-design/icons-vue'
 import { usePaperStore } from '@/stores'
 import * as api from '@/api'
 import type { PdfOutlineNode } from '@/utils/pdf-outline'
-import {
-  SECTION_CATEGORY_LABELS,
-  READING_PURPOSE_LABELS,
-  type PaperSection,
-  type ReadingPurpose,
-  type SectionCategory,
-} from '@/types'
-
-defineProps<{
-  selectedSection?: PaperSection | null
-}>()
+import { READING_PURPOSE_LABELS, type ReadingPurpose } from '@/types'
 
 const paperStore = usePaperStore()
 const selectedPurpose = ref<ReadingPurpose | null>(null)
@@ -91,21 +79,8 @@ async function onOutlineClick(n: PdfOutlineNode) {
   }
 }
 
-const categoryIcons: Record<SectionCategory, string> = {
-  background: '📚',
-  methodology: '⚙️',
-  innovation: '💡',
-  experiment: '🧪',
-  discussion: '💬',
-  conclusion: '🔮',
-  other: '📎',
-}
-
 async function loadSummary() {
   await paperStore.loadOneSentenceSummary()
-  if (paperStore.sections.every((s: PaperSection) => !s.summary)) {
-    await paperStore.summarizeAll()
-  }
 }
 
 async function selectPurpose(purpose: ReadingPurpose) {
@@ -113,39 +88,11 @@ async function selectPurpose(purpose: ReadingPurpose) {
   await paperStore.getRecommendation(purpose)
 }
 
-function sectionSummaryText(s: PaperSection): string {
-  if (!s.summary) return ''
-  if (typeof s.summary === 'string') return s.summary
-  return s.summary.content ?? ''
-}
-
 onMounted(loadSummary)
 </script>
 
 <template>
   <div class="p-4 space-y-5 overflow-auto h-full">
-    <!-- Paragraph summary (from PDF click) -->
-    <section v-if="selectedSection">
-      <div class="flex items-center gap-2 mb-2">
-        <AlignLeftOutlined class="text-primary" />
-        <h4 class="text-sm font-semibold text-text-primary">段落总结</h4>
-      </div>
-      <div class="rounded-lg border-2 border-primary/30 bg-primary/5 p-3">
-        <p class="text-sm font-medium text-text-primary mb-1">
-          {{ selectedSection.title || '未命名章节' }}
-        </p>
-        <p
-          v-if="sectionSummaryText(selectedSection)"
-          class="text-sm text-text-secondary leading-relaxed"
-        >
-          {{ sectionSummaryText(selectedSection) }}
-        </p>
-        <p v-else class="text-xs text-text-muted italic">
-          该章节暂无总结内容
-        </p>
-      </div>
-    </section>
-
     <!-- Innovation points -->
     <section v-if="paperStore.oneSentenceSummary?.innovations?.length">
       <div class="flex items-center gap-2 mb-2">
@@ -174,45 +121,6 @@ onMounted(loadSummary)
               <p class="text-xs text-text-secondary mt-1 leading-relaxed">
                 {{ point.description }}
               </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Section summaries by category -->
-    <section>
-      <div class="flex items-center gap-2 mb-2">
-        <TagOutlined class="text-accent" />
-        <h4 class="text-sm font-semibold text-text-primary">段落总结</h4>
-      </div>
-
-      <div v-if="paperStore.summarizing" class="text-center py-8 text-text-muted text-sm">
-        正在分析论文结构...
-      </div>
-
-      <div v-else class="space-y-2">
-        <div
-          v-for="(sections, category) in paperStore.sectionsByCategory"
-          :key="category"
-        >
-          <div class="flex items-center gap-1.5 mb-1.5">
-            <span class="text-sm">{{ categoryIcons[category as SectionCategory] }}</span>
-            <span class="text-xs font-medium text-text-secondary">
-              {{ SECTION_CATEGORY_LABELS[category as SectionCategory] }}
-            </span>
-          </div>
-          <div class="space-y-1.5 ml-5">
-            <div
-              v-for="section in sections"
-              :key="section.id"
-              class="p-2 rounded-md bg-surface-alt text-xs text-text-secondary leading-relaxed cursor-pointer
-                     hover:bg-primary/5 transition-colors"
-            >
-              <span class="font-medium text-text-primary">{{ section.title }}</span>
-              <span v-if="section.summary">
-                — {{ typeof section.summary === 'string' ? section.summary : section.summary.content }}
-              </span>
             </div>
           </div>
         </div>
