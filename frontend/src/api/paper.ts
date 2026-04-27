@@ -45,17 +45,26 @@ export async function getPaperSections(paperId: string): Promise<PaperSection[]>
   return data
 }
 
+export type TranslateEngine = 'baidu' | 'llm'
+
 export async function translateText(
   paperId: string,
   text: string,
   pageNumber: number,
   domain?: string,
+  engine: TranslateEngine = 'baidu',
+  signal?: AbortSignal,
 ): Promise<{ translated: string; domain: string }> {
-  const { data } = await apiClient.post(`/papers/${paperId}/translate`, {
-    text,
-    page_number: pageNumber,
-    domain: domain || undefined,
-  })
+  const { data } = await apiClient.post(
+    `/papers/${paperId}/translate`,
+    {
+      text,
+      page_number: pageNumber,
+      domain: domain || undefined,
+      engine,
+    },
+    { signal },
+  )
   return data
 }
 

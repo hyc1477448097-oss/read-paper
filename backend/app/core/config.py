@@ -18,6 +18,15 @@ class Settings(BaseSettings):
     deepseek_llm_model: str = "deepseek-chat"
     deepseek_embed_model: str = "deepseek-embedding"
 
+    # Baidu Translate (general VIP API)
+    baidu_translate_appid: str = ""
+    baidu_translate_appkey: str = ""
+    baidu_translate_url: str = "https://fanyi-api.baidu.com/api/trans/vip/translate"
+    baidu_translate_from: str = "auto"
+    baidu_translate_to: str = "zh"
+    # 百度对未认证/标准版常有 QPS 限制；54003 Invalid Access Limit 时需加大间隔
+    baidu_translate_min_interval_sec: float = 1.05
+
     # PostgreSQL
     postgres_host: str = "localhost"
     postgres_port: int = 5432

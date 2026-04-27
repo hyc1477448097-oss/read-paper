@@ -2,21 +2,23 @@ import { defineStore } from 'pinia'
 import { ref, reactive } from 'vue'
 import type { TranslationSegment } from '@/types'
 import * as api from '@/api'
+import type { TranslateEngine } from '@/api/paper'
 
 export const useTranslationStore = defineStore('translation', () => {
   const cache = reactive<Map<string, TranslationSegment>>(new Map())
   const detectedDomain = ref('')
   const loading = ref(false)
 
-  function cacheKey(paperId: string, text: string): string {
-    return `${paperId}::${text.slice(0, 100)}`
+  function cacheKey(paperId: string, text: string, engine: TranslateEngine): string {
+    return `${paperId}::${engine}::${text.slice(0, 100)}`
   }
 
   function getCached(
     paperId: string,
     text: string,
+    engine: TranslateEngine = 'baidu',
   ): TranslationSegment | undefined {
-    return cache.get(cacheKey(paperId, text))
+    return cache.get(cacheKey(paperId, text, engine))
   }
 
   async function translate(
@@ -24,8 +26,10 @@ export const useTranslationStore = defineStore('translation', () => {
     text: string,
     pageNumber: number,
     domain?: string,
+    engine: TranslateEngine = 'baidu',
+    signal?: AbortSignal,
   ): Promise<TranslationSegment> {
-    const key = cacheKey(paperId, text)
+    const key = cacheKey(paperId, text, engine)
     const existing = cache.get(key)
     if (existing) return existing
 
@@ -36,6 +40,8 @@ export const useTranslationStore = defineStore('translation', () => {
         text,
         pageNumber,
         domain,
+        engine,
+        signal,
       )
       detectedDomain.value = returnedDomain
 

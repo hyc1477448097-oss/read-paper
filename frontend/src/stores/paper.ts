@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, shallowRef } from 'vue'
 import type {
   Paper,
   PaperSection,
@@ -22,6 +22,8 @@ export const usePaperStore = defineStore('paper', () => {
   const totalPages = ref(0)
   const scale = ref(1.0)
   const isTranslateMode = ref(false)
+  /** 全文/PDF 翻译会话：关翻译时 abort，取消进行中的请求 */
+  const fullPageTranslateAbort = shallowRef<AbortController | null>(null)
   const viewMode = ref<'pdf' | 'parsed'>('pdf')
 
   const loading = ref(false)
@@ -129,6 +131,12 @@ export const usePaperStore = defineStore('paper', () => {
   }
 
   function toggleTranslateMode() {
+    if (isTranslateMode.value) {
+      fullPageTranslateAbort.value?.abort()
+      fullPageTranslateAbort.value = null
+    } else {
+      fullPageTranslateAbort.value = new AbortController()
+    }
     isTranslateMode.value = !isTranslateMode.value
   }
 
@@ -137,6 +145,8 @@ export const usePaperStore = defineStore('paper', () => {
   }
 
   function $reset() {
+    fullPageTranslateAbort.value?.abort()
+    fullPageTranslateAbort.value = null
     currentPaper.value = null
     sections.value = []
     highlights.value = []
@@ -161,6 +171,7 @@ export const usePaperStore = defineStore('paper', () => {
     totalPages,
     scale,
     isTranslateMode,
+    fullPageTranslateAbort,
     viewMode,
     loading,
     summarizing,

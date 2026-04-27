@@ -11,6 +11,9 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    if ((error as { code?: string }).code === 'ERR_CANCELED') {
+      return Promise.reject(error)
+    }
     const message = error.response?.data?.detail || error.message || '请求失败'
     console.error('[API Error]', message)
     return Promise.reject(error)

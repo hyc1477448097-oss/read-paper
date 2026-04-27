@@ -22,8 +22,9 @@ from app.schemas.paper import (
     RecommendRequest,
     RecommendResponse,
 )
+from app.services.baidu_translate import BaiduTranslateError, translate_with_baidu
 from app.services.llm_service import (
-    translate_text,
+    translate_text_llm,
     answer_question,
     summarize_section,
     one_sentence_summary,
@@ -40,13 +41,20 @@ async def translate(paper_id: str, req: TranslateRequest, db: AsyncSession = Dep
     if not paper:
         raise HTTPException(status_code=404, detail="论文不存在")
     domain = req.domain or paper.domain
+    engine = req.engine
 
-    cache_key = f"translate:{paper_id}:{hash(req.text + (domain or ''))}"
+    cache_key = f"translate:{paper_id}:{engine}:{hash(req.text + (domain or ''))}"
     cached = await cache_get(cache_key)
     if cached:
         return TranslateResponse(translated=cached["translated"], domain=domain)
 
-    translated = await translate_text(req.text, domain)
+    if engine == "llm":
+        translated = await translate_text_llm(req.text, domain)
+    else:
+        try:
+            translated = await translate_with_baidu(req.text)
+        except BaiduTranslateError as e:
+            raise HTTPException(status_code=502, detail=str(e)) from e
     await cache_set(cache_key, {"translated": translated}, ttl=7200)
     return TranslateResponse(translated=translated, domain=domain)
 

@@ -51,9 +51,9 @@ async def get_embedding(text: str) -> list[float]:
     return result[0]
 
 
-# ---------- Domain-aware translation ----------
+# ---------- Domain-aware translation (LLM, for intelligent / sidebar translate) ----------
 
-async def translate_text(text: str, domain: str | None = None) -> str:
+async def translate_text_llm(text: str, domain: str | None = None) -> str:
     system_prompt = (
         "你是一个专业的学术论文翻译助手。请将以下英文学术文本翻译为中文，"
         "保留专业术语的准确性，必要时在中文翻译后用括号标注英文原文。"

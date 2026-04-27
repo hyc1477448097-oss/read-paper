@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -88,6 +90,8 @@ class TranslateRequest(BaseModel):
     text: str
     page_number: int | None = None
     domain: str | None = None
+    # baidu: PDF 全文/划词覆盖翻译；llm: 侧栏智能翻译（融合 domain）
+    engine: Literal["baidu", "llm"] = "baidu"
 
 
 class TranslateResponse(BaseModel):

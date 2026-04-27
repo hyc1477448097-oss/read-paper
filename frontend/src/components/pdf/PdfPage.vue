@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, toRaw } from 'vue'
+import axios from 'axios'
 import { normalizeUnicode, setLayerDimensions } from 'pdfjs-dist'
 import { renderPage } from '@/utils/pdf'
 import { removeNullCharacters } from '@/vendor/pdfjs-web/remove-null-characters'
@@ -131,10 +132,14 @@ function collectTranslationBlocks(root: HTMLElement) {
 
 async function loadTranslations() {
   if (!paperStore.isTranslateMode || !paperStore.currentPaper) return
+  const signal = paperStore.fullPageTranslateAbort?.signal
   for (const block of translationBlocks.value) {
+    if (!paperStore.isTranslateMode) return
+    if (signal?.aborted) return
     const cached = translationStore.getCached(
       paperStore.currentPaper.id,
       block.text,
+      'baidu',
     )
     if (cached) {
       block.translation = cached.translated
@@ -144,10 +149,14 @@ async function loadTranslations() {
           paperStore.currentPaper.id,
           block.text,
           props.pageNumber,
+          undefined,
+          'baidu',
+          signal,
         )
         block.translation = seg.translated
-      } catch {
-        // skip failed translations silently
+      } catch (e) {
+        if (axios.isCancel(e) || (e as { code?: string }).code === 'ERR_CANCELED') return
+        // skip other failed translations silently
       }
     }
   }

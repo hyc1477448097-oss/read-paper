@@ -34,7 +34,7 @@ function handleTextSelected(payload: { text: string; pageNumber: number }) {
     translationResult.value = null
     const domain = functionPanelRef.value?.userDomain || undefined
     translationStore
-      .translate(paperStore.currentPaper.id, payload.text, payload.pageNumber, domain)
+      .translate(paperStore.currentPaper.id, payload.text, payload.pageNumber, domain, 'llm')
       .then((seg) => {
         translationResult.value = { original: seg.original, translated: seg.translated }
       })
