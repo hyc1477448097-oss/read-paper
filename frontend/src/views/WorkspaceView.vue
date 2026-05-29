@@ -16,8 +16,8 @@ const translationResult = ref<{ original: string; translated: string } | null>(n
 const catalogOpen = ref(true)
 const functionOpen = ref(true)
 
-const catalogWidth = ref(Math.round(window.innerWidth * 0.2))
-const functionWidth = ref(Math.round(window.innerWidth * 0.35))
+const catalogWidth = ref(Math.round(window.innerWidth * 0.5))
+const functionWidth = ref(Math.round(window.innerWidth * 0.5))
 
 const isResizing = ref(false)
 
@@ -79,14 +79,14 @@ function startResize(
 
 const startCatalogResize = startResize(
   catalogWidth,
-  Math.round(window.innerWidth * 0.1),
-  Math.round(window.innerWidth * 0.3),
+  Math.round(window.innerWidth * 0.12),
+  Math.round(window.innerWidth * 0.4),
   'left',
 )
 const startFunctionResize = startResize(
   functionWidth,
-  Math.round(window.innerWidth * 0.2),
-  Math.round(window.innerWidth * 0.45),
+  Math.round(window.innerWidth * 0.22),
+  Math.round(window.innerWidth * 0.52),
   'right',
 )
 </script>

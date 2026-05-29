@@ -42,9 +42,9 @@
   --color-badge-conclusion: #e0e7ff;
 
   /* Sidebar */
-  --width-sidebar: 420px;
-  --width-sidebar-min: 320px;
-  --width-sidebar-max: 560px;
+  --width-sidebar: 480px;
+  --width-sidebar-min: 280px;
+  --width-sidebar-max: 720px;
 
   /* Header */
   --height-header: 56px;

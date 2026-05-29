@@ -27,6 +27,8 @@ openai==1.58.1
 httpx==0.28.1
 
 # Utils
+# pymilvus 2.4.x still imports pkg_resources (removed in setuptools 82+)
+setuptools>=65,<82
 pydantic==2.10.3
 pydantic-settings==2.7.0
 aiofiles==24.1.0
