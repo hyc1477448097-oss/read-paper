@@ -10,7 +10,7 @@
 | 向量数据库 | Milvus 2.5 (pymilvus) | 论文文本切片 Embedding 存储与检索 (RAG) |
 | 缓存 | Redis 5.x (redis-py async) | 翻译/总结/分析结果缓存 |
 | PDF 解析 | PyMuPDF (fitz) | 提取全文、章节结构、引用列表 |
-| LLM/Embedding | DeepSeek API (OpenAI 兼容) | deepseek-chat (LLM) + deepseek-embedding (向量) |
+| LLM/Embedding | DeepSeek API (OpenAI 兼容) + LangChain（答疑 RAG） | deepseek-chat / embedding；`rag_qa.py` |
 | 数据校验 | Pydantic 2.10 + pydantic-settings | 请求/响应模型 + 环境变量管理 |
 
 ## 二、项目目录结构
@@ -33,9 +33,11 @@ backend/
     │   └── paper.py              # ORM 模型: Paper, PaperSection, Reference
     ├── schemas/
     │   └── paper.py              # Pydantic 模型: 请求体 / 响应体
-    ├── services/
-    │   ├── pdf_parser.py         # PDF 解析: 标题提取 / 章节识别 / 引用抽取 / 文本切片
-    │   └── llm_service.py        # LLM 服务: 翻译 / 问答 / 总结 / 推荐 / 引用分析 / 契合度
+├── services/
+│   ├── pdf_parser.py         # PDF 解析: 标题提取 / 章节识别 / 引用抽取 / 文本切片
+│   ├── llm_service.py        # LLM 服务: 翻译 / 总结 / 推荐 / 引用分析 / 契合度等
+│   ├── rag_qa.py             # 上下文答疑: LangChain Retriever + Chat 链
+│   └── baidu_translate.py    # 百度翻译
     └── api/
         ├── papers.py             # 论文 CRUD 端点
         ├── ai.py                 # AI 功能端点 (翻译/问答/总结/推荐)
@@ -166,14 +168,28 @@ backend/
 
 | 函数 | 用途 | temperature |
 |------|------|-------------|
-| `translate_text()` | 领域感知翻译，保留术语 | 0.1 |
-| `answer_question()` | 基于上下文片段的问答 | 0.2 |
+| `translate_text_llm()` | 领域感知翻译，保留术语 | 0.1 |
+| `answer_question()` | 委托 `rag_qa.answer_from_chunks`（LangChain） | 0.2 |
 | `summarize_section()` | 段落分析 → JSON {summary, category} | 0.1 |
+| `summarize_outline_chapter()` | 书签章节总结（纯文本） | 0.25 |
 | `one_sentence_summary()` | 全文总结 → JSON {one_sentence, innovation_points} | 0.1 |
 | `recommend_sections()` | 根据阅读目的推荐章节 | 0.2 |
 | `analyze_references()` | 解析引用元数据 (标题/年份/来源/级别) | 0.0 |
 | `analyze_relevance()` | 论文-方向契合度评分 | 0.1 |
 | `get_embeddings()` | 批量文本向量化 | — |
+
+### 5.3 上下文答疑 RAG (`rag_qa.py`)
+
+基于 **LangChain** 的答疑链路（API 契约仍为 `AskResponse`）:
+
+| 组件 | 说明 |
+|------|------|
+| `PaperMilvusRetriever` | 自定义 Retriever：选中文本优先 + `get_embedding` + `search_chunks`；无命中则用段落降级 |
+| `ask_with_langchain` | 检索 → Prompt → `ChatOpenAI`(DeepSeek) → `StrOutputParser` |
+| `answer_from_chunks` | 仅生成侧，复用同一 Prompt 链 |
+| `RAG_TOP_K` / `settings.rag_top_k` | Milvus 检索条数，默认 5 |
+
+向量写入与检索入口仍为章程约定的 `app.db.milvus`；LangChain 只负责编排与生成。
 
 ## 六、数据流
 
@@ -198,13 +214,15 @@ PyMuPDF 解析 → 提取标题/章节/引用
 ```
 用户提问 + (可选) 选中文本
     ↓
-问题文本 → DeepSeek Embedding
+ai.ask → 准备 fallback 段落
     ↓
-Milvus 向量检索 (top-5, 限定 paper_id)
+rag_qa.ask_with_langchain
     ↓
-拼接检索片段 + 用户选中文本 → 作为上下文
+PaperMilvusRetriever:
+  选中文本(可选) + 问题 Embedding → Milvus top-k (限定 paper_id)
+  若仍无文档 → PostgreSQL 前几段降级
     ↓
-DeepSeek Chat → 生成回答
+LangChain: ChatPromptTemplate | ChatOpenAI(DeepSeek) | StrOutputParser
     ↓
 返回 {answer, sources}
 ```

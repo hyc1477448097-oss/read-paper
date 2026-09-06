@@ -68,21 +68,13 @@ async def translate_text_llm(text: str, domain: str | None = None) -> str:
 
 
 # ---------- Context-aware Q&A ----------
+# 完整 RAG（Milvus 检索 + LangChain 生成）见 app.services.rag_qa.ask_with_langchain。
+# 下列函数保留给「已拿到片段、只需生成」的场景，实现同样走 LangChain Prompt 链。
 
 async def answer_question(question: str, context_chunks: list[str], domain: str | None = None) -> str:
-    context = "\n---\n".join(context_chunks)
-    system_prompt = (
-        "你是一个学术论文阅读助手。根据以下论文片段回答用户的问题。"
-        "如果片段中没有足够信息，请如实告知，不要编造。"
-        "回答时引用相关段落。"
-    )
-    if domain:
-        system_prompt += f"\n本论文属于「{domain}」领域。"
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"论文片段:\n{context}\n\n问题: {question}"},
-    ]
-    return await chat_completion(messages, temperature=0.2)
+    from app.services.rag_qa import answer_from_chunks
+
+    return await answer_from_chunks(question, context_chunks, domain)
 
 
 # ---------- Summarize ----------

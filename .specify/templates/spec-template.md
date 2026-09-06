@@ -95,16 +95,15 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
-### Constitutional Requirements
+### 章程要求（Constitutional Requirements）
 
-- **CR-001**: UI work MUST use React function components only; class components are out of scope.
-- **CR-002**: API work MUST use Next.js App Router route handlers under `app/api/`.
-- **CR-003**: Data persistence MUST use Prisma Client and Prisma migrations only.
-- **CR-004**: User input MUST be validated server-side with Zod before processing.
-- **CR-005**: API failures MUST use structured responses shaped as
-  `{ error: string, details?: unknown }` with appropriate HTTP status codes.
-- **CR-006**: The change MUST remain compatible with ESLint, Prettier, and TypeScript
-  strict mode.
+- **CR-001**：UI 工作 MUST 仅使用 Vue 3 Composition API 与 `<script setup>`；Options API 组件不在范围内。
+- **CR-002**：API 工作 MUST 使用 `backend/app/api/` 下的 FastAPI 路由，并以 `/api/` 前缀挂载。
+- **CR-003**：PostgreSQL 持久化 MUST 仅使用 SQLAlchemy 异步会话与 Alembic 迁移。
+- **CR-004**：涉及向量与缓存时，MUST 使用 `backend/app/db/` 下的 Milvus 与 Redis 辅助函数。
+- **CR-005**：请求与响应载荷 MUST 在 `backend/app/schemas/` 中用 Pydantic 模型定义。
+- **CR-006**：API 失败 MUST 抛出带合适状态码与可读 `detail` 的 `HTTPException`。
+- **CR-007**：前端变更 MUST 通过 `vue-tsc --noEmit`；后端变更 MUST 使用 Python 类型注解。
 
 ### Key Entities *(include if feature involves data)*
 

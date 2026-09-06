@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
 
+    # RAG / 上下文答疑
+    rag_top_k: int = 5
+
     # App
     upload_dir: str = "./uploads"
     cors_origins: str = '["http://localhost:3000","http://localhost:5173"]'

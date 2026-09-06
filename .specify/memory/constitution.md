@@ -1,128 +1,96 @@
 <!--
 Sync Impact Report
-Version change: unversioned template -> 1.0.0
+Version change: 2.0.0 -> 2.0.1
 Modified principles:
-- Template principle 1 -> I. Function Components Only
-- Template principle 2 -> II. App Router Route Handlers
-- Template principle 3 -> III. Prisma-Only Database Access
-- Template principle 4 -> IV. Server-Side Input Validation
-- Template principle 5 -> V. API Error Handling
-- Added VI. Conventional Commits
-- Added VII. Code Style Enforcement
+- 全部原则标题与正文翻译为简体中文（语义不变）
 Added sections:
-- Technology Constraints
-- Development Workflow and Quality Gates
+- None
 Removed sections:
-- Placeholder Section 2
-- Placeholder Section 3
+- None
 Templates requiring updates:
 - ✅ .specify/templates/plan-template.md
 - ✅ .specify/templates/spec-template.md
 - ✅ .specify/templates/tasks-template.md
-- ✅ .specify/templates/commands/*.md (directory not present; no update required)
-Runtime guidance:
-- ✅ .specify/extensions/git/README.md reviewed; no principle references required updates
 Follow-up TODOs:
 - None
 -->
-# sddReadmei Constitution
+# ReadMei 项目章程
 
-## Core Principles
+## 核心原则
 
-### I. Function Components Only
-All React components MUST be implemented as function components using React Hooks where
-state, lifecycle behavior, memoization, refs, or context are required. Class components are
-prohibited in pages, layouts, and all reusable UI components without exception.
+### I. 仅使用 Vue Composition API
+所有 Vue 组件 MUST 使用 Composition API 与 `<script setup>` 单文件组件实现。视图、布局及所有可复用
+UI 组件中，禁止 Options API 组件与 class 风格 Vue 组件，无例外。
 
-Rationale: A single React component model keeps the codebase consistent with modern React
-and prevents parallel lifecycle patterns from accumulating.
+理由：统一的 Vue 编写模式使前端与 Vue 3 最佳实践保持一致，避免多种组件写法并存。
 
-### II. App Router Route Handlers
-All API endpoints MUST use Next.js App Router route handlers under `app/api/`. API routes
-under `pages/api/` are prohibited. Every route handler MUST return an appropriate HTTP
-status code and MUST use structured error handling with a consistent response shape.
+### II. FastAPI 路由处理器
+所有 API 端点 MUST 在 `backend/app/api/` 下以 FastAPI 路由实现，并在 `backend/app/main.py` 中以
+`/api/` 前缀挂载。路由处理器 MUST 返回合适的 HTTP 状态码，并在错误与成功路径中使用 `HTTPException`
+或类型化响应模型。
 
-Rationale: App Router route handlers align routing, server behavior, and deployment
-semantics behind one supported Next.js API surface.
+理由：将 API 表面集中在 FastAPI 路由中，使路由、校验与部署语义统一于单一后端入口。
 
-### III. Prisma-Only Database Access
-All database operations MUST go through Prisma Client. Raw SQL queries, including direct
-`SELECT * FROM` strings, `$queryRaw`, `$executeRaw`, and direct `pg` connections, are
-prohibited. Schema changes MUST be expressed in the Prisma schema and applied through
-`prisma migrate`.
+### III. 仅通过 SQLAlchemy 访问数据库
+所有 PostgreSQL 操作 MUST 通过 `backend/app/db/postgres.py` 提供的 SQLAlchemy 异步会话执行。禁止
+原始 SQL 字符串、直接 `asyncpg` 连接及临时数据库驱动。Schema 变更 MUST 在 SQLAlchemy 模型中表达，
+并通过 Alembic 迁移应用。
 
-Rationale: Prisma centralizes type safety, schema evolution, and reviewable database
-changes, reducing hidden data access paths.
+理由：SQLAlchemy 集中管理类型安全的持久化、Schema 演进与可审查的数据库变更，减少隐藏的数据访问路径。
 
-### IV. Server-Side Input Validation
-All user input MUST be validated on the server with a Zod schema before processing.
-Client-side validation MAY improve user experience, but it MUST NOT be treated as a
-security boundary. Zod schemas SHOULD live beside the corresponding route handler or
-server action.
+### IV. Pydantic 服务端校验
+所有请求与响应载荷 MUST 在 `backend/app/schemas/` 中用 Pydantic 模型定义，并由 FastAPI 路由处理器
+消费。客户端校验 MAY 改善用户体验，但 MUST NOT 作为安全边界。
 
-Rationale: Server-side Zod validation makes trust boundaries explicit and keeps validation
-logic close to the code that consumes the input.
+理由：Pydantic 校验使信任边界明确，并将 Schema 定义置于消费它们的代码附近。
 
-### V. API Error Handling
-Every API route handler MUST contain a `try`/`catch` block and return appropriate HTTP
-status codes: `400` for validation errors, `401` or `403` for authentication or
-authorization errors, `404` for missing resources, and `500` for unexpected failures.
-Error responses MUST follow `{ error: string, details?: unknown }`.
+### V. 结构化 API 错误处理
+每个 API 路由处理器 MUST 对预期失败抛出带合适状态码的 `HTTPException`：校验或错误输入用 `400`，
+资源不存在用 `404`，冲突用 `409`，上游服务失败用 `502`，意外失败用 `500`。错误 `detail` MUST 为
+人类可读字符串或适合客户端展示的结构化对象。
 
-Rationale: A consistent error contract makes clients simpler and keeps operational
-failures diagnosable without leaking implementation details.
+理由：一致的错误契约简化 Vue 客户端，并使运维故障可诊断，同时不泄露实现细节。
 
-### VI. Conventional Commits
-All commit messages MUST follow the Conventional Commits prefix set: `feat:`, `fix:`,
-`docs:`, `chore:`, `refactor:`, `test:`, `style:`, `perf:`, `ci:`, or `build:`.
-Commits without a valid prefix MUST be rejected.
+### VI. 约定式提交（Conventional Commits）
+所有提交信息 MUST 遵循 Conventional Commits 前缀：`feat:`、`fix:`、`docs:`、`chore:`、
+`refactor:`、`test:`、`style:`、`perf:`、`ci:` 或 `build:`。无有效前缀的提交 MUST 被拒绝。
 
-Rationale: Consistent commit metadata supports readable history, automated release notes,
-and predictable change classification.
+理由：一致的提交元数据支持可读历史、自动化发布说明与可预测的变更分类。
 
-### VII. Code Style Enforcement
-All code MUST pass ESLint and Prettier checks before merge. Formatting requirements are
-non-negotiable: pull requests with lint errors or style violations MUST NOT be accepted.
-TypeScript strict mode MUST be enabled in `tsconfig.json` with `"strict": true`.
+### VII. 类型安全与构建门禁
+前端变更在合并前 MUST 通过 `vue-tsc --noEmit`。后端新增或修改的文件 MUST 使用 Python 类型注解及
+`from __future__ import annotations`。未通过前端类型检查或引入未类型化公开 API 的 PR MUST NOT
+被接受。
 
-Rationale: Automated style and type checks keep review focused on behavior and prevent
-avoidable defects from entering the codebase.
+理由：静态类型检查使评审聚焦行为，并防止可避免缺陷进入代码库。
 
-## Technology Constraints
+## 技术约束
 
-The application stack is constrained to modern Next.js, React function components, App
-Router route handlers, Prisma Client for persistence, Zod for server-side validation,
-TypeScript strict mode, ESLint, and Prettier. Any feature plan that requires a conflicting
-technology or bypasses these tools MUST document the violation in the plan's Constitution
-Check and MUST NOT proceed until the constitution is amended.
+应用栈限定为：Vue 3 Composition API、TypeScript、Vite、Pinia、FastAPI、SQLAlchemy 异步
+PostgreSQL、Alembic、通过 `pymilvus` 的 Milvus、Redis、Pydantic，以及前端 Axios HTTP 调用。任何
+需要冲突技术或绕过上述工具的特性计划 MUST 在计划的「章程检查」中记录违规项，且在章程修订前 MUST NOT
+继续推进。
 
-Database migrations MUST be generated from Prisma schema changes and applied with
-`prisma migrate`. Raw SQL access and direct database driver usage are not acceptable
-implementation shortcuts.
+向量检索 MUST 使用 `backend/app/db/milvus.py` 中的 Milvus 辅助函数。缓存访问 MUST 使用
+`backend/app/db/redis.py` 中的 Redis 辅助函数。在这些模块之外直接使用驱动不是可接受的实现捷径。
 
-## Development Workflow and Quality Gates
+## 开发流程与质量门禁
 
-Feature specifications MUST identify whether a change touches UI components, API routes,
-database access, user input, or commit/release workflow. Implementation plans MUST include
-a Constitution Check covering all seven core principles before Phase 0 research and again
-after Phase 1 design.
+特性规格 MUST 识别变更是否涉及 Vue 组件、FastAPI 路由、PostgreSQL 访问、Milvus 或 Redis 使用、
+用户输入或提交/发布流程。实施计划 MUST 在 Phase 0 调研前及 Phase 1 设计后各包含一次覆盖全部七项
+核心原则的章程检查。
 
-Task lists MUST include explicit work for colocated Zod validation, App Router route
-handlers, Prisma schema or client usage, structured API error responses, and code quality
-checks whenever those areas are in scope. Before merge, contributors MUST run or otherwise
-verify ESLint, Prettier, and TypeScript strict-mode checks.
+任务列表 MUST 在相关范围内明确包含 Pydantic Schema、FastAPI 路由处理器、SQLAlchemy 模型或会话、
+Milvus 或 Redis 集成、结构化 API 错误响应，以及类型检查/构建验证等工作。合并前，贡献者 MUST 对
+前端变更运行或验证 `vue-tsc --noEmit`，并对后端变更验证受影响的 API 路径。
 
-## Governance
+## 治理
 
-This constitution supersedes conflicting development practices, templates, and informal
-conventions. Amendments MUST be made by updating this document, recording the sync impact
-report, and propagating any changed rules to affected Spec Kit templates and runtime
-guidance.
+本章程优先于冲突的开发实践、模板与非正式约定。修订 MUST 通过更新本文档、记录同步影响报告，并将
+变更规则传播至受影响的 Spec Kit 模板与运行时指南完成。
 
-Versioning follows semantic versioning. MAJOR versions remove or redefine principles in a
-backward-incompatible way, MINOR versions add principles or materially expand governance,
-and PATCH versions clarify wording without changing meaning. Each feature review MUST
-verify compliance with the current constitution; any exception requires an approved
-constitutional amendment before implementation proceeds.
+版本遵循语义化版本：MAJOR 以不兼容方式移除或重定义原则，MINOR 新增原则或实质性扩展治理，PATCH
+仅澄清措辞而不改变含义。每次特性评审 MUST 验证与当前章程的合规性；任何例外在实施前 MUST 获得
+已批准的章程修订。
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-07 | **Last Amended**: 2026-05-07
+**Version**: 2.0.1 | **Ratified**: 2026-05-07 | **Last Amended**: 2026-05-31

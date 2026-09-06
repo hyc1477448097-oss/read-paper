@@ -1,6 +1,7 @@
 """AI feature endpoints: translate, ask, summarize, one-sentence, recommend.
 
 All mounted under /api/papers prefix in main.py.
+Ask/RAG is implemented via LangChain in ``app.services.rag_qa``.
 """
 from __future__ import annotations
 
@@ -9,8 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.postgres import get_db
-from app.db.milvus import search_chunks
 from app.db.redis import cache_get, cache_set
+from app.core.config import settings
 from app.models.paper import Paper, PaperSection
 from app.schemas.paper import (
     TranslateRequest,
@@ -27,13 +28,12 @@ from app.schemas.paper import (
 from app.services.baidu_translate import BaiduTranslateError, translate_with_baidu
 from app.services.llm_service import (
     translate_text_llm,
-    answer_question,
     summarize_section,
     summarize_outline_chapter,
     one_sentence_summary,
     recommend_sections,
-    get_embedding,
 )
+from app.services.rag_qa import ask_with_langchain
 
 router = APIRouter()
 
@@ -68,32 +68,34 @@ async def ask(paper_id: str, req: AskRequest, db: AsyncSession = Depends(get_db)
     if not paper:
         raise HTTPException(status_code=404, detail="论文不存在")
 
-    context_chunks: list[str] = []
-    try:
-        q_emb = await get_embedding(req.question)
-        hits = search_chunks(q_emb, paper_id=paper_id, top_k=5)
-        context_chunks = [h["chunk_text"] for h in hits]
-    except Exception:
-        pass
-
+    selected: str | None = None
     if req.context and isinstance(req.context, dict):
-        selected = req.context.get("selectedText") or req.context.get("selected_text")
-        if selected:
-            context_chunks.insert(0, str(selected))
+        raw = req.context.get("selectedText") or req.context.get("selected_text")
+        if raw:
+            selected = str(raw)
 
-    if not context_chunks:
-        result = await db.execute(
-            select(PaperSection)
-            .where(PaperSection.paper_id == paper_id)
-            .order_by(PaperSection.idx)
-            .limit(3)
+    # 向量检索无命中或失败时，用前若干段落正文降级
+    result = await db.execute(
+        select(PaperSection)
+        .where(PaperSection.paper_id == paper_id)
+        .order_by(PaperSection.idx)
+        .limit(3)
+    )
+    fallback_texts = [sec.content[:2000] for sec in result.scalars().all()]
+
+    try:
+        out = await ask_with_langchain(
+            question=req.question,
+            paper_id=paper_id,
+            domain=paper.domain,
+            selected_text=selected,
+            fallback_texts=fallback_texts,
+            top_k=settings.rag_top_k,
         )
-        for sec in result.scalars().all():
-            context_chunks.append(sec.content[:2000])
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"答疑服务暂时不可用: {e}") from e
 
-    answer = await answer_question(req.question, context_chunks, paper.domain)
-    sources = [c[:200] + "..." for c in context_chunks[:3]]
-    return AskResponse(answer=answer, sources=sources)
+    return AskResponse(answer=out["answer"], sources=out.get("sources") or [])
 
 
 @router.post("/{paper_id}/summarize", response_model=SummarizeResponse)

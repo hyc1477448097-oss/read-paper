@@ -10,9 +10,9 @@ description: "Task list template for feature implementation"
 
 **Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
 
-**Constitution**: Tasks MUST preserve function components, App Router route handlers,
-Prisma-only data access, server-side Zod validation, structured API errors, Conventional
-Commits, and ESLint/Prettier/TypeScript strict-mode quality gates.
+**章程（Constitution）**：任务 MUST 保持 Vue Composition API 组件、FastAPI 路由处理器、仅 SQLAlchemy
+访问 PostgreSQL、适用时使用 Milvus/Redis 辅助函数、Pydantic 校验、结构化 API 错误、Conventional
+Commits，以及前后端类型检查门禁。
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -25,7 +25,8 @@ Commits, and ESLint/Prettier/TypeScript strict-mode quality gates.
 ## Path Conventions
 
 - **Single project**: `src/`, `tests/` at repository root
-- **Next.js web app**: `app/`, `app/api/`, `components/`, `lib/`, `prisma/`, `tests/`
+- **ReadMei web app**: `frontend/src/`, `backend/app/api/`, `backend/app/models/`,
+  `backend/app/schemas/`, `backend/app/services/`, `backend/app/db/`
 - **Web app**: `backend/src/`, `frontend/src/`
 - **Mobile**: `api/src/`, `ios/src/` or `android/src/`
 - Paths shown below assume single project - adjust based on plan.md structure
@@ -55,7 +56,7 @@ Commits, and ESLint/Prettier/TypeScript strict-mode quality gates.
 
 - [ ] T001 Create project structure per implementation plan
 - [ ] T002 Initialize [language] project with [framework] dependencies
-- [ ] T003 [P] Configure ESLint, Prettier, and TypeScript strict mode
+- [ ] T003 [P] Configure frontend TypeScript checks with `vue-tsc --noEmit`
 
 ---
 
@@ -67,11 +68,11 @@ Commits, and ESLint/Prettier/TypeScript strict-mode quality gates.
 
 Examples of foundational tasks (adjust based on your project):
 
-- [ ] T004 Setup Prisma schema and migration workflow
+- [ ] T004 Setup SQLAlchemy models and Alembic migration workflow
 - [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup Next.js App Router route handler structure under `app/api/`
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure structured API error handling with `{ error: string, details?: unknown }`
+- [ ] T006 [P] Setup FastAPI route handler structure under `backend/app/api/`
+- [ ] T007 Create base SQLAlchemy models that all stories depend on
+- [ ] T008 Configure structured API error handling with `HTTPException` and typed responses
 - [ ] T009 Setup environment configuration management
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
@@ -93,11 +94,11 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Create [Entity1] Prisma model in prisma/schema.prisma
-- [ ] T013 [P] [US1] Create React function component in components/[component].tsx
-- [ ] T014 [US1] Implement [Service] with Prisma Client in lib/[service].ts (depends on T012)
-- [ ] T015 [US1] Implement App Router endpoint in app/api/[route]/route.ts
-- [ ] T016 [US1] Add colocated Zod validation and structured error handling
+- [ ] T012 [P] [US1] Create [Entity1] SQLAlchemy model in backend/app/models/[entity].py
+- [ ] T013 [P] [US1] Create Vue Composition API component in frontend/src/components/[component].vue
+- [ ] T014 [US1] Implement [Service] with SQLAlchemy session in backend/app/services/[service].py (depends on T012)
+- [ ] T015 [US1] Implement FastAPI endpoint in backend/app/api/[route].py
+- [ ] T016 [US1] Add Pydantic schemas and structured error handling
 - [ ] T017 [US1] Add logging for user story 1 operations
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
@@ -161,7 +162,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
-- [ ] TXXX Run ESLint, Prettier, and TypeScript strict-mode checks
+- [ ] TXXX Run `vue-tsc --noEmit` and verify affected backend type hints
 
 ---
 
@@ -187,8 +188,8 @@ Examples of foundational tasks (adjust based on your project):
 - Tests (if included) MUST be written and FAIL before implementation
 - Models before services
 - Services before endpoints
-- Zod schemas before request processing logic
-- Prisma schema changes before Prisma Client usage
+- Pydantic schemas before request processing logic
+- SQLAlchemy model changes before session usage
 - Core implementation before integration
 - Story complete before moving to next priority
 
@@ -254,7 +255,7 @@ With multiple developers:
 - [Story] label maps task to specific user story for traceability
 - Each user story should be independently completable and testable
 - Verify tests fail before implementing
-- Verify App Router, Prisma, Zod, and structured error handling requirements before review
+- Verify FastAPI routes, SQLAlchemy, Pydantic, and structured error handling before review
 - Use only valid Conventional Commits prefixes when committing completed work
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently

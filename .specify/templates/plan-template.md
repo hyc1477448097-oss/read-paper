@@ -27,22 +27,22 @@
 **Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
 **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
-## Constitution Check
+## 章程检查（Constitution Check）
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*门禁：Phase 0 调研前 MUST 通过；Phase 1 设计后 MUST 再次检查。*
 
-Document how the plan satisfies each constitutional gate:
+说明本计划如何满足各项章程门禁：
 
-- React UI uses function components only; class components are not introduced.
-- API endpoints use Next.js App Router route handlers under `app/api/`, not `pages/api/`.
-- Database access uses Prisma Client only; schema changes are represented in Prisma and
-  applied with `prisma migrate`.
-- All user input is validated server-side with colocated Zod schemas before processing.
-- API route handlers use `try`/`catch`, appropriate HTTP status codes, and
-  `{ error: string, details?: unknown }` error responses.
-- Commit workflow uses valid Conventional Commits prefixes.
-- ESLint, Prettier, and TypeScript strict mode (`"strict": true`) remain required quality
-  gates.
+- Vue UI 仅使用 `<script setup>` Composition API；不引入 Options API 组件。
+- API 端点使用 `backend/app/api/` 下的 FastAPI 路由，在 `main.py` 中以 `/api/` 前缀挂载。
+- PostgreSQL 访问仅通过 SQLAlchemy 异步会话；Schema 变更在 SQLAlchemy 模型中表达，并通过
+  Alembic 迁移应用。
+- 涉及向量或缓存时，Milvus 与 Redis 访问使用 `backend/app/db/milvus.py` 与
+  `backend/app/db/redis.py` 中的辅助函数。
+- 所有请求与响应载荷在 `backend/app/schemas/` 中用 Pydantic 模型校验。
+- API 路由处理器抛出带合适状态码与可读 `detail` 的 `HTTPException`。
+- 提交流程使用有效的 Conventional Commits 前缀。
+- 前端变更通过 `vue-tsc --noEmit`；后端变更使用 Python 类型注解。
 
 ## Project Structure
 
