@@ -27,7 +27,7 @@
 |------|------|
 | [backend/app/schemas/paper.py](../backend/app/schemas/paper.py) | `ChapterSummaryRequest` / `ChapterSummaryResponse` |
 | [backend/app/api/ai.py](../backend/app/api/ai.py) | `POST /{paper_id}/chapter-summary`：求交拼正文 → Redis 缓存命中则直接返回；否则 LLM 后写入缓存 |
-| [backend/app/services/llm_service.py](../backend/app/services/llm_service.py) | `summarize_outline_chapter`：压缩式槽位总结（作用 / 核心做法 / 关键结论，约 ≤150–200 字）；解析段落可能与书签不完全对齐 |
+| [backend/app/services/llm_service.py](../backend/app/services/llm_service.py) | `summarize_outline_chapter`：研究者视角；禁止套话；先总判断（主旨+全文角色）再 1～3 条重点；解析段落可能与书签不完全对齐 |
 
 ## 接口约定
 
