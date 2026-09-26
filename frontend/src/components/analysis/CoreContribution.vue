@@ -15,6 +15,7 @@ const paperStore = usePaperStore()
 const selectedPurpose = ref<ReadingPurpose | null>(null)
 
 const selectedOutlineKey = ref<string | null>(null)
+const lastOutlineNode = ref<PdfOutlineNode | null>(null)
 const chapterSummary = ref('')
 const chapterSummaryLoading = ref(false)
 const chapterSummaryError = ref('')
@@ -45,20 +46,19 @@ watch(
     chapterSummaryError.value = ''
     chapterSummaryLoading.value = false
     selectedOutlineKey.value = null
+    lastOutlineNode.value = null
   },
 )
 
-async function onOutlineClick(n: PdfOutlineNode) {
+async function fetchChapterSummary(n: PdfOutlineNode, forceRefresh = false) {
   if (!paperStore.currentPaper) return
-  selectedOutlineKey.value = outlineRowKey(n)
-  const tp = paperStore.totalPages || 1
-  const page = Math.max(1, Math.min(tp, n.pageStart))
-  paperStore.setPage(page)
 
   const myId = ++chapterReqId
   chapterSummaryLoading.value = true
   chapterSummaryError.value = ''
-  chapterSummary.value = ''
+  if (!forceRefresh) {
+    chapterSummary.value = ''
+  }
   try {
     const domain = paperStore.currentPaper.domain ?? undefined
     const { summary } = await api.summarizeChapter(paperStore.currentPaper.id, {
@@ -66,6 +66,7 @@ async function onOutlineClick(n: PdfOutlineNode) {
       page_start: n.pageStart,
       page_end: n.pageEnd,
       domain: domain || undefined,
+      force_refresh: forceRefresh,
     })
     if (myId !== chapterReqId) return
     chapterSummary.value = summary
@@ -77,6 +78,21 @@ async function onOutlineClick(n: PdfOutlineNode) {
   } finally {
     if (myId === chapterReqId) chapterSummaryLoading.value = false
   }
+}
+
+async function onOutlineClick(n: PdfOutlineNode) {
+  if (!paperStore.currentPaper) return
+  selectedOutlineKey.value = outlineRowKey(n)
+  lastOutlineNode.value = n
+  const tp = paperStore.totalPages || 1
+  const page = Math.max(1, Math.min(tp, n.pageStart))
+  paperStore.setPage(page)
+  await fetchChapterSummary(n, false)
+}
+
+async function onRegenerateChapterSummary() {
+  if (!lastOutlineNode.value || chapterSummaryLoading.value) return
+  await fetchChapterSummary(lastOutlineNode.value, true)
 }
 
 async function loadSummary() {
@@ -171,6 +187,16 @@ onMounted(loadSummary)
             <p class="text-danger text-xs">{{ chapterSummaryError }}</p>
           </template>
           <template v-else-if="chapterSummary">
+            <div class="flex justify-end mb-1.5">
+              <button
+                type="button"
+                class="text-[11px] text-primary hover:underline disabled:opacity-50"
+                :disabled="chapterSummaryLoading"
+                @click="onRegenerateChapterSummary"
+              >
+                重新生成
+              </button>
+            </div>
             <p class="whitespace-pre-wrap">{{ chapterSummary }}</p>
           </template>
           <template v-else>

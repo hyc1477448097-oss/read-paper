@@ -5,6 +5,8 @@ Ask/RAG is implemented via LangChain in ``app.services.rag_qa``.
 """
 from __future__ import annotations
 
+import hashlib
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +38,9 @@ from app.services.llm_service import (
 from app.services.rag_qa import ask_with_langchain
 
 router = APIRouter()
+
+# 章节总结较贵且正文相对稳定；7 天（translate=2h / summarize=1h）
+CHAPTER_SUMMARY_TTL = 7 * 24 * 3600
 
 
 @router.post("/{paper_id}/translate", response_model=TranslateResponse)
@@ -190,6 +195,21 @@ def _overlaps(ps: int, pe: int, span: tuple[int, int]) -> bool:
     return not (ee < ps or ss > pe)
 
 
+def _chapter_summary_cache_key(
+    paper_id: str,
+    outline_title: str,
+    page_start: int,
+    page_end: int,
+    domain: str | None,
+    context: str,
+) -> str:
+    """Key = paper + title + pages + domain + content fingerprint (re-parse → miss)."""
+    content_fp = hashlib.sha256(context.encode("utf-8")).hexdigest()[:16]
+    meta = f"{outline_title}|{page_start}|{page_end}|{domain or ''}|{content_fp}"
+    meta_fp = hashlib.sha256(meta.encode("utf-8")).hexdigest()[:24]
+    return f"chapter_summary:{paper_id}:{meta_fp}"
+
+
 @router.post("/{paper_id}/chapter-summary", response_model=ChapterSummaryResponse)
 async def chapter_summary(
     paper_id: str,
@@ -203,6 +223,7 @@ async def chapter_summary(
         raise HTTPException(status_code=422, detail="page_end 不能小于 page_start")
 
     domain = req.domain if req.domain is not None else paper.domain
+    outline_title = req.outline_title.strip()
 
     result = await db.execute(
         select(PaperSection)
@@ -227,8 +248,25 @@ async def chapter_summary(
             "请仅根据书签标题说明该章节通常可能包含的内容类型，并提醒用户补充解析或检查 PDF。）"
         )
 
-    summary = await summarize_outline_chapter(req.outline_title.strip(), context, domain)
-    return ChapterSummaryResponse(summary=summary, domain=domain)
+    cache_key = _chapter_summary_cache_key(
+        paper_id, outline_title, ps, pe, domain, context
+    )
+    if not req.force_refresh:
+        cached = await cache_get(cache_key)
+        if cached and isinstance(cached, dict) and cached.get("summary"):
+            return ChapterSummaryResponse(
+                summary=cached["summary"],
+                domain=domain,
+                cached=True,
+            )
+
+    summary = await summarize_outline_chapter(outline_title, context, domain)
+    await cache_set(
+        cache_key,
+        {"summary": summary, "domain": domain},
+        ttl=CHAPTER_SUMMARY_TTL,
+    )
+    return ChapterSummaryResponse(summary=summary, domain=domain, cached=False)
 
 
 @router.post("/{paper_id}/recommend", response_model=RecommendResponse)

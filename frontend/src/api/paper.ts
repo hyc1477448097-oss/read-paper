@@ -75,17 +75,20 @@ export async function summarizeChapter(
     page_start: number
     page_end: number
     domain?: string
+    force_refresh?: boolean
   },
-): Promise<{ summary: string; domain: string | null }> {
-  const { data } = await apiClient.post<{ summary: string; domain: string | null }>(
-    `/papers/${paperId}/chapter-summary`,
-    {
-      outline_title: body.outline_title,
-      page_start: body.page_start,
-      page_end: body.page_end,
-      domain: body.domain || undefined,
-    },
-  )
+): Promise<{ summary: string; domain: string | null; cached?: boolean }> {
+  const { data } = await apiClient.post<{
+    summary: string
+    domain: string | null
+    cached?: boolean
+  }>(`/papers/${paperId}/chapter-summary`, {
+    outline_title: body.outline_title,
+    page_start: body.page_start,
+    page_end: body.page_end,
+    domain: body.domain || undefined,
+    force_refresh: body.force_refresh ?? false,
+  })
   return data
 }
 

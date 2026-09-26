@@ -131,11 +131,14 @@ class ChapterSummaryRequest(BaseModel):
     page_start: int = Field(ge=1)
     page_end: int = Field(ge=1)
     domain: str | None = None
+    # True：跳过读缓存，LLM 后覆盖写入（「重新生成」）
+    force_refresh: bool = False
 
 
 class ChapterSummaryResponse(BaseModel):
     summary: str
     domain: str | None = None
+    cached: bool = False
 
 
 class RelevanceRequest(BaseModel):
